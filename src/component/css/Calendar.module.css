@@ -1,0 +1,241 @@
+.calendarContainer {
+  display: flex;
+  height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: rgba(47, 46, 46, 0.834);
+  color: #252423;
+}
+
+/* Sidebar */
+.calendarSidebar {
+  width: 200px;
+  background-color:black; /* Teams-like sidebar */
+  color:  #d1d1e0;
+  padding: 20px;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.calendarSidebar h2 {
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  color: white;
+}
+
+.calendarSidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.calendarSidebar li {
+  margin: 10px 0;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.calendarSidebar li:hover,
+.calendarSidebar .active {
+  background-color:  rgba(47, 46, 46, 0.834);
+  border: 1px solid rgb(63, 67, 56);
+}
+
+/* Main */
+.calendarMain {
+  flex-grow: 1;
+  padding: 20px;
+}
+
+/* Header */
+.calendarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.calendarHeaderTitle {
+  display: flex;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.calendarHeaderTitle h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #d1d1e0;
+}
+
+.calendarControls button {
+  background-color: #6264a7; /* Teams primary purple */
+  color:  #d1d1e0;
+  border: none;
+  padding: 6px 14px;
+  margin-left: 8px;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.calendarControls button:hover {
+  background-color: #464775;
+}
+
+/* Dropdowns */
+.dropdown {
+  position: absolute;
+  background-color:  #d1d1e0;
+  border: 1px solid  #d1d1e0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  margin-top: 5px;
+  z-index: 100;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.dropdown div {
+  padding: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dropdown div:hover {
+  background-color: white;
+}
+
+/* Grid */
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.calendarDayName {
+  font-weight: bold;
+  text-align: center;
+  padding: 8px 0;
+  background-color:  #d1d1e0;
+  border-radius: 4px;
+}
+
+.calendarCell {
+  background-color: #d1d1e0;
+  padding: 12px;
+  text-align: center;
+  border-radius: 6px;
+  min-height: 60px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.1s ease;
+}
+
+.calendarCell:hover {
+  transform: scale(1.02);
+  background-color:white;
+}
+
+.today {
+  background-color: rgba(47, 46, 46, 0.834);
+  border: 2px solid #6264a7;
+  color:#d1d1e0 ;
+  font-weight: bold;
+}
+.today:hover{
+  background-color: black;
+  color: white;
+}
+.dropdown {
+  background: #fff;
+  border: 1px solid #ccc;
+  position: absolute;
+  z-index: 10;
+  padding: 10px;
+}
+
+.yearPopup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.yearPopupContent {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-height: 80%;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.yearGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.yearGrid div {
+  padding: 10px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.weekView, .dayView {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: #eef;
+  text-align: center;
+  font-size: 1.2rem;
+}
+.modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
+ 
+}
+.modalContent {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+}
+.eventItem {
+  background: #007bff;
+  color: white;
+  margin-top: 2px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.eventItem {
+  background: #007bff;
+  color: white;
+  margin-top: 2px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.deleteButton {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 12px;
+  margin-left: 8px;
+  cursor: pointer;
+}
+
