@@ -896,12 +896,102 @@
 
 // export default Chat;
 
-import React from 'react'
+import React, { useState, useEffect } from 'react';
+import { MdOpenInNew } from 'react-icons/md';
+import axios from 'axios';
+import style from '../component/css/Call.module.css';
 
-const Meet = () => {
+const NewGroupChat = () => {
+  const [showModal, setShowModal] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [groupName, setGroupName] = useState('');
+
+  // Fetch usernames on modal open
+  const fetchUsers = async () => {
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/get_signup/');
+      setUsers(res.data);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  };
+
+  const toggleUser = (id) => {
+    setSelectedMembers((prev) =>
+      prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
+    );
+  };
+
+  const createGroup = async () => {
+    try {
+      const payload = {
+        name: groupName,
+        members: selectedMembers,
+      };
+      await axios.post('http://127.0.0.1:8000/groupcreate/', payload);
+      alert('Group created!');
+      setShowModal(false);
+      setGroupName('');
+      setSelectedMembers([]);
+    } catch (err) {
+      console.error('Error creating group:', err);
+    }
+  };
+
   return (
-    <div>Meet</div>
-  )
-}
+    <div>
+      {/* New Chat Icon */}
+      <div
+        className={style.cornericon}
+        title="New Chat"
+        onClick={() => {
+          setShowModal(true);
+          fetchUsers();
+        }}
+      >
+        <MdOpenInNew />
+      </div>
 
-export default Meet
+      {/* Modal */}
+      {showModal && (
+        <div className={style.modal}>
+          <div className={style.modalContent}>
+            <h3>Create Group</h3>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="Group Name"
+              className={style.groupInput}
+            />
+
+            <div className={style.userList}>
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  onClick={() => toggleUser(user.id)}
+                  className={`${style.userItem} ${
+                    selectedMembers.includes(user.id) ? style.selected : ''
+                  }`}
+                >
+                  {user.username}
+                </div>
+              ))}
+            </div>
+
+            <button className={style.createBtn} onClick={createGroup}>
+              Create Group
+            </button>
+            <button className={style.cancelBtn} onClick={() => setShowModal(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NewGroupChat;
+
