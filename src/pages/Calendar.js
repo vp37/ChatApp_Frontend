@@ -1,4 +1,4 @@
-// Calendar.js (Full Working React Code with Time Slot Handling)
+// Calendar.js (React Full Working Code with Multi-Hour Time Slot Event Support)
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import style from "../component/css/Calendar.module.css";
@@ -18,7 +18,8 @@ const Calendar = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [eventTitle, setEventTitle] = useState("");
-  const [eventTime, setEventTime] = useState("");
+  const [eventStartTime, setEventStartTime] = useState("");
+  const [eventEndTime, setEventEndTime] = useState("");
   const [todayEvents, setTodayEvents] = useState([]);
   const [showTodayPopup, setShowTodayPopup] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -63,20 +64,22 @@ const Calendar = () => {
   }, [month, year, user, token]);
 
   const handleAddEvent = () => {
-    if (!user?.id || !eventTitle || !selectedDate || !eventTime) return;
+    if (!user?.id || !eventTitle || !selectedDate || !eventStartTime || !eventEndTime) return;
 
     const payload = {
       user: user.id,
       title: eventTitle,
       date: selectedDate,
-      time: eventTime,
+      start_time: eventStartTime,
+      end_time: eventEndTime,
     };
 
     axios.post("http://127.0.0.1:8000/calendar-events/", payload)
       .then((res) => {
         setEvents((prev) => [...prev, res.data]);
         setEventTitle("");
-        setEventTime("");
+        setEventStartTime("");
+        setEventEndTime("");
         setShowModal(false);
       })
       .catch(console.error);
@@ -157,7 +160,7 @@ const Calendar = () => {
                   <span>{date}</span>
                   {dayEvents.map((ev, idx) => (
                     <div key={idx} className={style.eventItem}>
-                      {ev.time && <strong>{ev.time} - </strong>}{ev.title}
+                      <strong>{ev.start_time} - {ev.end_time}</strong> {ev.title}
                       <button className={style.deleteButton} onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id); }}>❌</button>
                     </div>
                   ))}
@@ -178,7 +181,8 @@ const Calendar = () => {
                 const nm = (idx + 1) % 2 === 0 ? "00" : "30";
                 return (
                   <li key={idx} className={style.slot} onClick={() => {
-                    setEventTime(`${String(h).padStart(2, "0")}:${m}`);
+                    setEventStartTime(`${String(h).padStart(2, "0")}:${m}`);
+                    setEventEndTime(`${String(nh).padStart(2, "0")}:${nm}`);
                     setEventTitle("");
                     setSelectedDate(selectedDay);
                     setShowModal(true);
@@ -192,7 +196,7 @@ const Calendar = () => {
               <h4>Events on {selectedDay}</h4>
               <ul>
                 {events.filter(ev => ev.date === selectedDay).map((ev, idx) => (
-                  <li key={idx}>🕒 {ev.time} - {ev.title} <button onClick={() => handleDeleteEvent(ev.id)}>❌</button></li>
+                  <li key={idx}>🕒 {ev.start_time} - {ev.end_time} - {ev.title} <button onClick={() => handleDeleteEvent(ev.id)}>❌</button></li>
                 ))}
               </ul>
             </div>
@@ -203,8 +207,16 @@ const Calendar = () => {
       {showModal && (
         <div className={style.modal}>
           <div className={style.modalContent}>
-            <h3>Add Event for {selectedDate} at {eventTime}</h3>
+            <h3>Add Event for {selectedDate}</h3>
             <input type="text" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} placeholder="Event title" />
+            <div>
+              <label>Start Time: </label>
+              <input type="time" value={eventStartTime} onChange={(e) => setEventStartTime(e.target.value)} />
+            </div>
+            <div>
+              <label>End Time: </label>
+              <input type="time" value={eventEndTime} onChange={(e) => setEventEndTime(e.target.value)} />
+            </div>
             <button onClick={handleAddEvent}>Add</button>
             <button onClick={() => setShowModal(false)}>Cancel</button>
           </div>
@@ -216,7 +228,7 @@ const Calendar = () => {
           <div className={style.modalContent}>
             <h3>📅 Events Today ({today.toISOString().split("T")[0]})</h3>
             <ul>
-              {todayEvents.map((ev, i) => <li key={i}>🔹 {ev.time} - {ev.title}</li>)}
+              {todayEvents.map((ev, i) => <li key={i}>🔹 {ev.start_time} - {ev.end_time} - {ev.title}</li>)}
             </ul>
             <button onClick={() => setShowTodayPopup(false)}>Close</button>
           </div>

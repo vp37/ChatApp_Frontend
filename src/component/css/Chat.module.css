@@ -473,6 +473,64 @@
   cursor: pointer;
 }
 
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.inputBox {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.userList {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.userItem {
+  padding: 8px;
+  margin-bottom: 4px;
+  background-color: #f1f1f1;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.userItem:hover {
+  background-color: #ddd;
+}
+
+.selected {
+  background-color: #4caf50 !important;
+  color: white;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+
 
 
 

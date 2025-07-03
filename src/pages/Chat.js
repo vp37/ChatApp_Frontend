@@ -53,6 +53,14 @@ const Chat = () => {
   const [calling, setCalling] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
   const pendingCandidates = useRef([]);
+  const [showModal, setShowModal] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [groupName, setGroupName] = useState("");
+  const [groupList, setGroupList] = useState([]);
+  const [groupMessages, setGroupMessages] = useState([]);
+  const [groupInput, setGroupInput] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
 
   useEffect(() => {
     if (!you?.id) return;
@@ -60,7 +68,7 @@ const Chat = () => {
       .get(`http://127.0.0.1:8000/accept-getdata/${you?.id}/`)
       .then((res) => dispatch(setUserList(res.data)))
       .catch((err) => console.error("Error fetching user data", err));
-  }, [dispatch,you?.id]);
+  }, [dispatch, you?.id]);
 
   useEffect(() => {
     if (!selectedUser || !you) return;
@@ -114,7 +122,7 @@ const Chat = () => {
       });
   }, [selectedUser, you]);
 
-    const servers = {
+  const servers = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   };
 
@@ -130,37 +138,39 @@ const Chat = () => {
       const data = JSON.parse(event.data);
 
       switch (data.type) {
-      case "offer":
-        setIncomingCall(data.offer);
-        break;
+        case "offer":
+          setIncomingCall(data.offer);
+          break;
 
-      case "answer":
-        if (peerConnection.current) {
-          await peerConnection.current.setRemoteDescription(
-            new RTCSessionDescription(data.answer)
-          );
-          await applyBufferedCandidates();
-        }
-        break;
+        case "answer":
+          if (peerConnection.current) {
+            await peerConnection.current.setRemoteDescription(
+              new RTCSessionDescription(data.answer)
+            );
+            await applyBufferedCandidates();
+          }
+          break;
 
-      case "ice":
-        if (peerConnection.current) {
-          if (peerConnection.current.remoteDescription) {
-            await peerConnection.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        case "ice":
+          if (peerConnection.current) {
+            if (peerConnection.current.remoteDescription) {
+              await peerConnection.current.addIceCandidate(
+                new RTCIceCandidate(data.candidate)
+              );
+            } else {
+              pendingCandidates.current.push(data.candidate);
+            }
           } else {
             pendingCandidates.current.push(data.candidate);
           }
-        } else {
-          pendingCandidates.current.push(data.candidate);
-        }
-        break;
+          break;
 
-      case "call_end":
-        endCall();
-        break;
-      default:
-        break;
-    }  
+        case "call_end":
+          endCall();
+          break;
+        default:
+          break;
+      }
     };
 
     ws.current.onclose = () => console.log("WebSocket disconnected");
@@ -174,106 +184,108 @@ const Chat = () => {
 
   const createPeerConnection = async () => {
     if (peerConnection.current) {
-    console.warn("Existing peer connection found. Closing...");
-    peerConnection.current.close();
-    peerConnection.current = null;
-  }
-    try {
-    peerConnection.current = new RTCPeerConnection(servers);
-  } catch (err) {
-    console.error("Failed to create RTCPeerConnection:", err);
-    return; // stop further setup
-  }
-
-  if (!peerConnection.current) {
-    console.error("RTCPeerConnection creation failed, aborting setup.");
-    return;
-  }
-   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    stream.getTracks().forEach((track) => {
-      if (peerConnection.current) {
-    peerConnection.current.addTrack(track, stream);
-  }  else {
-    console.warn("PeerConnection destroyed before tracks could be added");
-  }
-    });
-
-    peerConnection.current.onicecandidate = (e) => {
-      if (e.candidate) {
-        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-          ws.current.send(
-            JSON.stringify({
-              type: "ice",
-              candidate: e.candidate,
-              from: you.id,
-              to: selectedUser.id,
-            })
-          );
-        } else {
-          console.warn("WebSocket is not ready, cannot send ICE candidate");
-        };
-      }
-    };
-
-    peerConnection.current.ontrack = (e) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = e.streams[0];
-      }
-    };
-  } catch (err) {
-    console.error("Error getting media:", err);
-    if (peerConnection.current) {
+      console.warn("Existing peer connection found. Closing...");
       peerConnection.current.close();
       peerConnection.current = null;
     }
-  }
+    try {
+      peerConnection.current = new RTCPeerConnection(servers);
+    } catch (err) {
+      console.error("Failed to create RTCPeerConnection:", err);
+      return; // stop further setup
+    }
+
+    if (!peerConnection.current) {
+      console.error("RTCPeerConnection creation failed, aborting setup.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      stream.getTracks().forEach((track) => {
+        if (peerConnection.current) {
+          peerConnection.current.addTrack(track, stream);
+        } else {
+          console.warn("PeerConnection destroyed before tracks could be added");
+        }
+      });
+
+      peerConnection.current.onicecandidate = (e) => {
+        if (e.candidate) {
+          if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+            ws.current.send(
+              JSON.stringify({
+                type: "ice",
+                candidate: e.candidate,
+                from: you.id,
+                to: selectedUser.id,
+              })
+            );
+          } else {
+            console.warn("WebSocket is not ready, cannot send ICE candidate");
+          }
+        }
+      };
+
+      peerConnection.current.ontrack = (e) => {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = e.streams[0];
+        }
+      };
+    } catch (err) {
+      console.error("Error getting media:", err);
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
+    }
   };
 
   const applyBufferedCandidates = async () => {
     for (const candidate of pendingCandidates.current) {
-      await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+      await peerConnection.current.addIceCandidate(
+        new RTCIceCandidate(candidate)
+      );
     }
     pendingCandidates.current = [];
   };
 
   const startCall = async () => {
-   if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-    console.error("WebSocket is not connected. Reconnect and try.");
-    return;
-  }
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket is not connected. Reconnect and try.");
+      return;
+    }
     setCalling(true);
     await createPeerConnection();
 
     if (!peerConnection.current) {
-    console.error("PeerConnection not created properly.");
-    setCalling(false);
-    return;
-  }
-     
+      console.error("PeerConnection not created properly.");
+      setCalling(false);
+      return;
+    }
+
     const offer = await peerConnection.current.createOffer();
     await peerConnection.current.setLocalDescription(offer);
 
-  if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-    ws.current.send(
-      JSON.stringify({
-        type: "offer",
-        offer,
-        from: you.id,
-        to: selectedUser.id,
-      })
-    );
-  } else {
-    console.warn("WebSocket is not ready, cannot send offer");
-  }
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(
+        JSON.stringify({
+          type: "offer",
+          offer,
+          from: you.id,
+          to: selectedUser.id,
+        })
+      );
+    } else {
+      console.warn("WebSocket is not ready, cannot send offer");
+    }
   };
 
   const acceptCall = async () => {
@@ -287,18 +299,18 @@ const Chat = () => {
     const answer = await peerConnection.current.createAnswer();
     await peerConnection.current.setLocalDescription(answer);
 
-if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-    ws.current.send(
-      JSON.stringify({
-        type: "answer",
-        answer,
-        from: you.id,
-        to: selectedUser.id,
-      })
-    );
-  } else {
-    console.warn("WebSocket is not ready, cannot send answer");
-  }
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(
+        JSON.stringify({
+          type: "answer",
+          answer,
+          from: you.id,
+          to: selectedUser.id,
+        })
+      );
+    } else {
+      console.warn("WebSocket is not ready, cannot send answer");
+    }
 
     await applyBufferedCandidates();
     setIncomingCall(null);
@@ -311,18 +323,17 @@ if (ws.current && ws.current.readyState === WebSocket.OPEN) {
 
   const endCall = () => {
     if (peerConnection.current) {
-    peerConnection.current.getSenders().forEach(sender => {
-      if (sender.track) sender.track.stop();
-    });
+      peerConnection.current.getSenders().forEach((sender) => {
+        if (sender.track) sender.track.stop();
+      });
 
-     peerConnection.current.getTransceivers().forEach((transceiver) => {
-      transceiver.stop();
-    });
+      peerConnection.current.getTransceivers().forEach((transceiver) => {
+        transceiver.stop();
+      });
 
-    peerConnection.current.close();
-    peerConnection.current = null;
-  }
-
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
 
     if (localVideoRef.current?.srcObject) {
       localVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
@@ -342,86 +353,86 @@ if (ws.current && ws.current.readyState === WebSocket.OPEN) {
   };
 
   const startScreenShare = async () => {
-  try {
-    const screenStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: true, // Optional: screen audio (depends on browser)
-    });
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true, // Optional: screen audio (depends on browser)
+      });
 
-    // Replace the video track
-    const screenTrack = screenStream.getVideoTracks()[0];
+      // Replace the video track
+      const screenTrack = screenStream.getVideoTracks()[0];
 
-    // Replace sender's video track
-    const sender = peerConnection.current.getSenders().find(s => s.track && s.track.kind === "video");
-    if (sender) {
-      sender.replaceTrack(screenTrack);
+      // Replace sender's video track
+      const sender = peerConnection.current
+        .getSenders()
+        .find((s) => s.track && s.track.kind === "video");
+      if (sender) {
+        sender.replaceTrack(screenTrack);
+      }
+
+      const offer = await peerConnection.current.createOffer();
+      await peerConnection.current.setLocalDescription(offer);
+
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.send(
+          JSON.stringify({
+            type: "offer",
+            offer,
+            from: you.id,
+            to: selectedUser.id,
+          })
+        );
+      } else {
+        console.warn("WebSocket is not ready, cannot send offer");
+      }
+
+      // Show screen locally
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = screenStream;
+      }
+
+      // When user stops screen sharing
+      screenTrack.onended = async () => {
+        console.log("Screen sharing stopped, switching back to camera");
+        await switchBackToCamera();
+      };
+    } catch (err) {
+      console.error("Error starting screen share:", err);
     }
+  };
 
-    const offer = await peerConnection.current.createOffer();
-    await peerConnection.current.setLocalDescription(offer);
+  const switchBackToCamera = async () => {
+    try {
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
 
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-    ws.current.send(
-      JSON.stringify({
-        type: "offer",
-        offer,
-        from: you.id,
-        to: selectedUser.id,
-      })
-    );
-  } else {
-    console.warn("WebSocket is not ready, cannot send offer");
-  }
+      const cameraTrack = cameraStream.getVideoTracks()[0];
+      const sender = peerConnection.current
+        .getSenders()
+        .find((s) => s.track && s.track.kind === "video");
+      if (sender) {
+        sender.replaceTrack(cameraTrack);
+      }
 
-    // Show screen locally
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = screenStream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = cameraStream;
+      }
+    } catch (err) {
+      console.error("Error switching back to camera:", err);
     }
+  };
 
-    // When user stops screen sharing
-    screenTrack.onended = async () => {
-      console.log("Screen sharing stopped, switching back to camera");
-      await switchBackToCamera();
-    };
-
-  } catch (err) {
-    console.error("Error starting screen share:", err);
-  }
-};
-
-
-const switchBackToCamera = async () => {
-  try {
-    const cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
-
-    const cameraTrack = cameraStream.getVideoTracks()[0];
-    const sender = peerConnection.current.getSenders().find(s => s.track && s.track.kind === "video");
-    if (sender) {
-      sender.replaceTrack(cameraTrack);
+  const stopScreenShare = () => {
+    const stream = localVideoRef.current.srcObject;
+    if (stream) {
+      const screenTrack = stream.getVideoTracks()[0];
+      if (screenTrack && screenTrack.kind === "video") {
+        screenTrack.stop(); // this triggers the onended event
+      }
     }
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = cameraStream;
-    }
-
-  } catch (err) {
-    console.error("Error switching back to camera:", err);
-  }
-};
-
-const stopScreenShare = () => {
-  const stream = localVideoRef.current.srcObject;
-  if (stream) {
-    const screenTrack = stream.getVideoTracks()[0];
-    if (screenTrack && screenTrack.kind === "video") {
-      screenTrack.stop(); // this triggers the onended event
-    }
-  }
-};
-
+  };
 
   const handleSend = () => {
     if (
@@ -458,6 +469,72 @@ const stopScreenShare = () => {
       uploadFiles();
     }
   };
+  const handleGroupSend = async () => {
+    if (
+      (!groupInput.trim() && selectedFiles.length === 0) ||
+      !selectedGroupId
+    ) {
+      return;
+    }
+
+    const payload = new FormData();
+    payload.append("content", groupInput);
+    payload.append("group", selectedGroupId); // ✅ correct key
+    payload.append("sender", you.id); // ✅ required by backend
+
+    selectedFiles.forEach((file) => {
+      payload.append("files", file);
+    });
+
+    try {
+      // Optimistically update UI
+      setGroupMessages((prev) => [
+        ...prev,
+        {
+          content: groupInput,
+          sender:  you.id, // Needed for rendering
+          timestamp: new Date().toISOString(),
+          files: selectedFiles.map((file) => ({
+            url: URL.createObjectURL(file),
+            name: file.name,
+          })),
+        },
+      ]);
+
+      await axios.post("http://127.0.0.1:8000/group/send-message/", payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setGroupInput("");
+      setSelectedFiles([]);
+    } catch (error) {
+      console.error("Failed to send group message:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedGroupId || !token) return;
+
+    const fetchGroupMessages = async () => {
+      try {
+        const res = await axios.get(
+          `http://127.0.0.1:8000/group/messages/${selectedGroupId}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setGroupMessages(res.data);
+      } catch (err) {
+        console.error("Error fetching group messages:", err);
+      }
+    };
+
+    fetchGroupMessages();
+  }, [selectedGroupId]);
 
   const uploadFiles = async () => {
     const formData = new FormData();
@@ -614,6 +691,59 @@ const stopScreenShare = () => {
         console.error("Mic error:", err);
       }
     }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await axios.get("http://127.0.0.1:8000/api/get_signup/");
+      setUsers(res.data);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
+  };
+
+  const toggleUser = (id) => {
+    setSelectedMembers((prev) =>
+      prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
+    );
+  };
+  useEffect(() => {
+    if (you?.id && token) {
+      axios
+        .get(`http://127.0.0.1:8000/get-group-user/${you.id}/`)
+        .then((res) => setGroupList(res.data))
+        .catch((err) => console.error("Error fetching group list:", err));
+    }
+  }, [you, token]);
+
+  const createGroup = async () => {
+    try {
+      const allMembers = [...selectedMembers, you.id]; 
+
+      const uniqueMembers = [...new Set(allMembers)];
+
+      const payload = {
+        name: groupName,
+        members: uniqueMembers,
+      };
+
+      const res = await axios.post(
+        "http://127.0.0.1:8000/groupcreate/",
+        payload
+      );
+
+      setGroupList((prev) => [...prev, res.data]);
+      setShowModal(false);
+      setGroupName("");
+      setSelectedMembers([]);
+    } catch (err) {
+      console.error("Error creating group:", err);
+    }
+  };
+
+  const getInitialgroup = (name) => {
+    if (!name) return "";
+    return name.charAt(0).toUpperCase();
   };
 
   const renderRightPanelContent = () => {
@@ -783,6 +913,187 @@ const stopScreenShare = () => {
         </div>
       );
     }
+    if (activeTab === 1) {
+      return (
+        <div className={style.chatmessagescontainer}>
+          {groupMessages.map((msg, index) => {
+            const isSender = msg.sender === you.id;
+
+            return (
+              <div
+                key={index}
+                className={isSender ? style.rightmessage : style.leftmessage}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: isSender ? "flex-start" : "flex-end",
+                    gap: "5px",
+                  }}
+                >
+                  {!isSender && (
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        fontSize: "13px",
+                        color: "#555",
+                      }}
+                    >
+                      {msg.sender_username}
+                    </span>
+                  )}
+
+                  {msg.voice_url && (
+                    <audio controls style={{ width: "200px" }}>
+                      <source
+                        src={`http://127.0.0.1:8000${msg.voice_url}`}
+                        type="audio/webm"
+                      />
+                    </audio>
+                  )}
+
+                  {msg.files && msg.files.length > 0 ? (
+                    <div
+                      style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                    >
+                      {msg.files.map((file, idx) => {
+                        const fullUrl = `http://127.0.0.1:8000${file.url}`;
+                        const isImage = file.url.match(
+                          /\.(jpeg|jpg|png|gif|webp)$/i
+                        );
+                        const isPDF = file.url.match(/\.pdf$/i);
+                        const isDoc = file.url.match(/\.(doc|docx)$/i);
+
+                        return (
+                          <a
+                            key={idx}
+                            href={fullUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ textDecoration: "none", color: "blue" }}
+                          >
+                            {isImage ? (
+                              <img
+                                src={fullUrl}
+                                alt={file.name || "uploaded file"}
+                                style={{
+                                  maxWidth: "200px",
+                                  maxHeight: "200px",
+                                  borderRadius: "8px",
+                                }}
+                              />
+                            ) : isPDF ? (
+                              <div
+                                style={{
+                                  width: "150px",
+                                  height: "200px",
+                                  border: "1px solid #ccc",
+                                  borderRadius: "8px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexDirection: "column",
+                                  background: "#f9f9f9",
+                                }}
+                              >
+                                <img
+                                  src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                                  alt="PDF"
+                                  style={{ width: "50px", height: "50px" }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  {file.name}
+                                </span>
+                              </div>
+                            ) : isDoc ? (
+                              <div
+                                style={{
+                                  width: "150px",
+                                  height: "200px",
+                                  border: "1px solid #ccc",
+                                  borderRadius: "8px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexDirection: "column",
+                                  background: "#f9f9f9",
+                                }}
+                              >
+                                <img
+                                  src="https://upload.wikimedia.org/wikipedia/commons/4/4f/Microsoft_Word_2013_logo.svg"
+                                  alt="DOC"
+                                  style={{ width: "50px", height: "50px" }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  {file.name}
+                                </span>
+                              </div>
+                            ) : (
+                              <span>{file.name || "View File"}</span>
+                            )}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : msg.file_url ? (
+                    <a
+                      href={msg.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: "none", color: "blue" }}
+                    >
+                      {msg.file_url.match(/\.(jpeg|jpg|png|gif|webp)$/i) ? (
+                        <img
+                          src={msg.file_url}
+                          alt={msg.fileName || "uploaded file"}
+                          style={{
+                            maxWidth: "200px",
+                            maxHeight: "200px",
+                            borderRadius: "8px",
+                          }}
+                        />
+                      ) : (
+                        <span>{msg.fileName || "View File"}</span>
+                      )}
+                    </a>
+                  ) : null}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    {msg.content && (
+                      <p style={{ fontSize: "14px" }}>{msg.content}</p>
+                    )}
+                    <span>
+                      {new Date(
+                        msg.timestamp || Date.now()
+                      ).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
     if (activeTab === "post") {
       return (
         <div style={{ padding: 20 }}>
@@ -875,15 +1186,61 @@ const stopScreenShare = () => {
             <div className={style.cornericon} title="Filter">
               <IoFilter />
             </div>
-            <div className={style.cornericon} title="Meet Now" onClick={startScreenShare}>
+            <div
+              className={style.cornericon}
+              title="Meet Now"
+              onClick={startScreenShare}
+            >
               <IoVideocamOutline />
             </div>
-            <div className={style.cornericon} title="New Chat">
+            <div
+              className={style.cornericon}
+              title="New Chat"
+              onClick={() => {
+                setShowModal(true);
+                fetchUsers();
+              }}
+            >
               <MdOpenInNew />
             </div>
           </div>
         </div>
+        {showModal && (
+          <div className={style.modalOverlay}>
+            <div className={style.modalContent}>
+              <h2>Create Group</h2>
 
+              <input
+                type="text"
+                placeholder="Enter group name"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                className={style.inputBox}
+              />
+
+              <div className={style.userList}>
+                {users
+                  .filter((u) => u.username !== loggedInUsername)
+                  .map((user) => (
+                    <div
+                      key={user.id}
+                      className={`${style.userItem} ${
+                        selectedMembers.includes(user.id) ? style.selected : ""
+                      }`}
+                      onClick={() => toggleUser(user.id)}
+                    >
+                      {user.username}
+                    </div>
+                  ))}
+              </div>
+
+              <div className={style.modalActions}>
+                <button onClick={createGroup}>Create</button>
+                <button onClick={() => setShowModal(false)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Display users */}
         {userList
           .filter((user) => user.username !== loggedInUsername)
@@ -916,6 +1273,36 @@ const stopScreenShare = () => {
               </div>
             </div>
           ))}
+        {groupList.map((group, index) => (
+          <div
+            key={`group-${index}`}
+            className={style.chatbusniesscontainer}
+            onClick={() => {
+              dispatch(setSelectedUser({ ...group, isGroup: true }));
+              setActiveTab(1);
+              setSelectedGroupId(group.id);
+            }}
+            style={{
+              cursor: "pointer",
+              backgroundColor:
+                selectedUser?.id === group.id && selectedUser?.isGroup
+                  ? "rgba(47, 46, 46, 0.834)"
+                  : "transparent",
+            }}
+          >
+            <div className={style.chatbusineesheader}>
+              <div className={style.chatbusinessicons}>
+                <div className={style.circle}>
+                  {getInitialgroup(group.name)}
+                </div>
+              </div>
+              <h3>{group.name}</h3>
+            </div>
+            <div className={style.chatbusinesssecondicon} title="Options">
+              <BiDotsHorizontal />
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Right panel - Chat Area */}
@@ -972,7 +1359,11 @@ const stopScreenShare = () => {
 
           <div className={style.chatnavcontainerright}>
             <div className={style.navbariconsleft}>
-              <div className={style.finaliconsnavbar} title="Video Call" onClick={startCall}>
+              <div
+                className={style.finaliconsnavbar}
+                title="Video Call"
+                onClick={startCall}
+              >
                 <FaVideo />
               </div>
               <div className={style.finaliconsnavbar} title="Voice Call">
@@ -988,30 +1379,45 @@ const stopScreenShare = () => {
             </div>
           </div>
 
-           {incomingCall && (
-        <div className={style.incomingCallPopup}>
-          <p>📞 Incoming video call...</p>
-          <button onClick={acceptCall}>Accept</button>
-          <button onClick={rejectCall}>Reject</button>
-        </div>
-      )}
+          {incomingCall && (
+            <div className={style.incomingCallPopup}>
+              <p>📞 Incoming video call...</p>
+              <button onClick={acceptCall}>Accept</button>
+              <button onClick={rejectCall}>Reject</button>
+            </div>
+          )}
 
-      {calling && (
-        <div className={style.videoContainer}>
-          <video ref={localVideoRef} autoPlay muted className={style.localVideo}></video>
-          <video ref={remoteVideoRef} autoPlay className={style.remoteVideo}></video>
-          <div className={style.videooverall} >
-            <button onClick={endCall} className={style.endCallButton}>End Call</button>
-          <div className={style.sharebutton} title="Meet Now" onClick={startScreenShare}>
-              <IoVideocamOutline />
-          </div>
-          </div>
-          
-          {/* <div className={style.stopbutton} title="Stop" onClick={stopScreenShare}>
+          {calling && (
+            <div className={style.videoContainer}>
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                className={style.localVideo}
+              ></video>
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                className={style.remoteVideo}
+              ></video>
+              <div className={style.videooverall}>
+                <button onClick={endCall} className={style.endCallButton}>
+                  End Call
+                </button>
+                <div
+                  className={style.sharebutton}
+                  title="Meet Now"
+                  onClick={startScreenShare}
+                >
+                  <IoVideocamOutline />
+                </div>
+              </div>
+
+              {/* <div className={style.stopbutton} title="Stop" onClick={stopScreenShare}>
               <MdStopCircle style={{ color: "red", fontSize: "14px" }} />
           </div> */}
-        </div>
-      )}
+            </div>
+          )}
 
           {/* Friend Request Modal */}
           {showFriendRequestModal && (
@@ -1125,6 +1531,75 @@ const stopScreenShare = () => {
             )}
           </div>
         )}
+
+        {activeTab === 1 && selectedGroupId && (
+          <div className={style.chatinput}>
+            <input
+              type="text"
+              placeholder="Type a group message"
+              value={groupInput}
+              onChange={(e) => setGroupInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleGroupSend();
+              }}
+            />
+            <div className={style.chatinputicons}>
+              <div
+                className={style.chatemojiicon}
+                title="Emoji"
+                onClick={() => setShowPicker(!showPicker)}
+              >
+                <MdEmojiEmotions />
+              </div>
+              <div
+                className={style.chatemojiicon}
+                title="Voice Message"
+                style={{ cursor: "pointer" }}
+                onClick={handleVoiceClick}
+              >
+                {recording ? (
+                  <MdStopCircle style={{ color: "red", fontSize: "14px" }} />
+                ) : (
+                  <MdOutlineSettingsVoice style={{ fontSize: "18px" }} />
+                )}
+              </div>
+              <div className={style.chatemojiicon} title="Insert Photo">
+                <MdInsertPhoto />
+              </div>
+              <div className={style.chatemojiicon} title="Attach Link">
+                <BsLink45Deg />
+              </div>
+              <div
+                className={style.chatemojiicon}
+                title="Add File"
+                onClick={() => fileInputRef.current.click()}
+              >
+                <IoAdd />
+              </div>
+              <div
+                className={style.specialicon}
+                onClick={handleGroupSend}
+                title="Send Message"
+              >
+                <IoSendSharp />
+              </div>
+            </div>
+
+            {showPicker && (
+              <div
+                style={{
+                  position: "absolute",
+                  zIndex: 1000,
+                  marginLeft: "500px",
+                  marginBottom: "500px",
+                }}
+              >
+                <EmojiPicker onEmojiClick={handleEmojiClick} />
+              </div>
+            )}
+          </div>
+        )}
+
         <input
           type="file"
           multiple
